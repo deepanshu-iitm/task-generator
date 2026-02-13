@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -19,6 +20,14 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = FastAPI(title="Tasks Generator API")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class GenerateTasksRequest(BaseModel):
     goal: str
@@ -31,6 +40,28 @@ class GenerateTasksRequest(BaseModel):
 @app.get("/")
 def root():
     return {"status": "Backend is running"}
+
+
+@app.get("/status")
+def status():
+    """Health check endpoint to verify backend, database, and LLM connection"""
+    status_data = {
+        "backend": "healthy",
+        "database": "not_configured",  # Using localStorage in frontend
+        "llm": "unknown"
+    }
+    
+    # Test LLM connection
+    try:
+        test_response = model.generate_content("Say 'OK'")
+        if test_response and test_response.text:
+            status_data["llm"] = "healthy"
+        else:
+            status_data["llm"] = "unhealthy"
+    except Exception as e:
+        status_data["llm"] = f"unhealthy: {str(e)[:50]}"
+    
+    return status_data
 
 
 @app.post("/generate-tasks")
